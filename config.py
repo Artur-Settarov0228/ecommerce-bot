@@ -10,6 +10,8 @@ class Settings:
     DB_PASS= os.getenv("DB_PASS")
     DB_PORT= os.getenv("DB_PORT")
     DB_HOST= os.getenv("DB_HOST")
-    ADMIN= os.getenv("ADMIN")
+    ADMIN = [
+        int(x) for x in os.getenv("ADMIN", "").split(",") if x
+    ]
         
 settings = Settings()

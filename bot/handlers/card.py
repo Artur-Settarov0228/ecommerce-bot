@@ -1,5 +1,5 @@
 from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from database.services.card_services import CartService
 
 # /cart — savatchani ko‘rish
@@ -46,3 +46,23 @@ async def clear_cart(update: Update, context: ContextTypes.DEFAULT_TYPE):
 cart_handler = CommandHandler("cart", view_cart)
 add_handler = CommandHandler("add", add_to_cart)
 clear_handler = CommandHandler("clear_cart", clear_cart)
+
+
+async def add_from_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data  # add:1
+    product_id = int(data.split(":")[1])
+    user_id = query.from_user.id
+
+    await CartService.add(user_id, product_id)
+    await query.edit_message_reply_markup(None)
+    await query.message.reply_text("✅ Savatchaga qo‘shildi")
+
+add_button_handler = CallbackQueryHandler(add_from_button, pattern="^add:")
+
+cart_text_handler = MessageHandler(
+    filters.TEXT & filters.Regex("^🛒 Savatcha$"),
+    view_cart
+)
