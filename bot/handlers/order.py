@@ -1,81 +1,79 @@
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update
 from telegram.ext import (
     ContextTypes,
-    CommandHandler,
+    ConversationHandler,
+    CallbackQueryHandler,
     MessageHandler,
     filters,
-    ConversationHandler,
 )
 
-from bot.states.checkout_state import ASK_NAME, ASK_PHONE
-from database.services.order_services import OrderService
+from bot.states.checkout_state import PHONE, ADDRESS
+from database.session import SessionLocal
+from database.models import User, Cart, CartItem, Product, Order, OrderItem, Status
+from config import ADMIN
+from sqlalchemy import select
 
 
-# 🔹 1. Checkout boshlanishi
-async def start_checkout(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "✍️ Ismingizni kiriting:"
+# 🔹 checkout boshlanishi (inline tugmadan)
+async def checkout_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    await query.message.reply_text(
+        "📱 Telefon raqamingizni kiriting:\nMasalan: +998901234567"
     )
-    return ASK_NAME
+    return PHONE
 
 
-# 🔹 2. Ismni olish
-async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["name"] = update.message.text
-
-    keyboard = ReplyKeyboardMarkup(
-        [[KeyboardButton("📞 Telefon raqamni yuborish", request_contact=True)]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    )
-
-    await update.message.reply_text(
-        "📞 Telefon raqamingizni yuboring:",
-        reply_markup=keyboard,
-    )
-    return ASK_PHONE
-
-
-# 🔹 3. Telefonni olish va order yaratish
+# 🔹 telefonni olish
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    contact = update.message.contact
-    if not contact:
-        await update.message.reply_text("❌ Telefonni tugma orqali yuboring")
-        return ASK_PHONE
-
-    name = context.user_data["name"]
-    phone = contact.phone_number
-    user_id = update.effective_user.id
-
-    order = await OrderService.checkout(
-        user_id=user_id,
-        name=name,
-        phone=phone,
-    )
-
-    if not order:
-        await update.message.reply_text("🛒 Savatcha bo‘sh")
-        return ConversationHandler.END
-
-    await update.message.reply_text(
-        "✅ Buyurtma qabul qilindi!\n"
-        "Tez orada siz bilan bog‘lanamiz."
-    )
-
-    return ConversationHandler.END
+    context.user_data["phone"] = update.message.text
+    await update.message.reply_text("📍 Yetkazib berish manzilini kiriting:")
+    return ADDRESS
 
 
-# 🔹 4. Cancel
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❌ Buyurtma bekor qilindi")
-    return ConversationHandler.END
+# 🔹 manzil → order yaratish
+async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    telegram_id = update.effective_user.id
+    phone = context.user_data["phone"]
+    address = update.message.text
 
+    with SessionLocal() as session:
+        user = session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        ).scalar_one_or_none()
 
-checkout_conversation = ConversationHandler(
-    entry_points=[CommandHandler("checkout", start_checkout)],
-    states={
-        ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_name)],
-        ASK_PHONE: [MessageHandler(filters.CONTACT, get_phone)],
-    },
-    fallbacks=[CommandHandler("cancel", cancel)],
-)
+        if not user:
+            await update.message.reply_text("❌ Foydalanuvchi topilmadi")
+            return ConversationHandler.END
+
+        cart = session.execute(
+            select(Cart).where(Cart.user_id == user.id)
+        ).scalar_one_or_none()
+
+        if not cart:
+            await update.message.reply_text("🛒 Savat bo‘sh")
+            return ConversationHandler.END
+
+        items = session.execute(
+            select(CartItem).where(CartItem.cart_id == cart.id)
+        ).scalars().all()
+
+        if not items:
+            await update.message.reply_text("🛒 Savat bo‘sh")
+            return ConversationHandler.END
+
+        total = 0
+        products = {}
+
+        for ci in items:
+            product = session.get(Product, ci.product_id)
+            if not product or not product.is_active:
+                await update.message.reply_text("❌ Mahsulot mavjud emas")
+                return ConversationHandler.END
+
+            if product.stock < ci.quantity:
+                await update.message.reply_text(
+                    f"❌ {product.name} uchun qoldiq yetarli emas"
+                )
+                return ConversationHandler.E

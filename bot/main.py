@@ -7,8 +7,9 @@ from bot.handlers.card import cart_handler, add_handler, clear_handler, add_butt
 from bot.handlers.product import products_text_handler
 from bot.handlers.card import cart_text_handler
 from bot.handlers.support import support_handler
-from bot.handlers.admin import add_product_handler
 from bot.handlers.order import checkout_conversation
+from bot.handlers.admin import add_product_conversation
+
 
 
 def main():
@@ -24,7 +25,8 @@ def main():
     app.add_handler(products_text_handler)
     app.add_handler(cart_text_handler)
     app.add_handler(support_handler)
-    app.add_handler(add_product_handler)
+    app.add_handler(add_product_conversation)
+
 
     app.run_polling()
 

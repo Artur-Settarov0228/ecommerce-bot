@@ -14,6 +14,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         full_name=user.full_name or "No name",
         language=user.language_code or "uz"
     )
+    print("USER ID:", user.id)
+    print("ADMINS:", settings.ADMIN)
+
 
     # 🔐 AGAR ADMIN BO‘LSA
     if user.id in settings.ADMIN:
