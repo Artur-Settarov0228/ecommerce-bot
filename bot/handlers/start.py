@@ -1,6 +1,6 @@
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
-from config import settings
+from config import TOKEN, ADMIN
 
 from database.services.user_services import UserService
 from bot.keyboard.user_keyboards import main_menu
@@ -15,11 +15,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         language=user.language_code or "uz"
     )
     print("USER ID:", user.id)
-    print("ADMINS:", settings.ADMIN)
+    print("ADMINS:",ADMIN)
 
 
     # 🔐 AGAR ADMIN BO‘LSA
-    if user.id in settings.ADMIN:
+    if user.id in ADMIN:
         await update.message.reply_text(
             "👑 Admin panel",
             reply_markup=admin_menu()

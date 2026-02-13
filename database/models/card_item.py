@@ -10,6 +10,7 @@ class CartItem(BaseModel):
         ForeignKey("users.id"),
         nullable=False
     )
+    cart_id = Column(Integer, ForeignKey("carts.id"))
     product_id = Column(
         Integer,
         ForeignKey("products.id"),
